@@ -5,11 +5,11 @@ from modules import script_callbacks, shared
 
 
 # AWS設定
-# s3 = boto3.client("s3", region_name="us-east-1")
 session = boto3.Session(profile_name="")
-s3 = session.client("s3", region_name="us-east-1")
+s3 = session.client("s3", region_name="ap-northeast-1")
 
 bucket_name = ""
+
 
 # shared.opts に設定追加（UIにも表示される）
 def on_ui_settings():
@@ -20,6 +20,7 @@ def on_ui_settings():
     )
 
 script_callbacks.on_ui_settings(on_ui_settings)
+
 
 # 実際の画像保存時フック
 def on_image_saved(params):
@@ -32,7 +33,27 @@ def on_image_saved(params):
     try:
         s3.upload_file(str(path), bucket_name, path.as_posix())
         print(f"[S3 UPLOAD] {path.as_posix()}")
+
+        jpg_path = Path(params.filename.replace(".png", ".jpg"))
+        if jpg_path.exists():
+            s3.upload_file(str(jpg_path), bucket_name, jpg_path.as_posix())
+            print(f"[S3 UPLOAD JPG] {jpg_path.as_posix()}")
     except Exception as e:
         print(f"[S3 ERROR] {e}")
 
 script_callbacks.on_image_saved(on_image_saved)
+
+
+def clean_outputs_before_save(params):
+    outputs_dir = Path("outputs")
+    if outputs_dir.exists():
+        for file in outputs_dir.rglob("*"):
+            if file.is_file():
+                try:
+                    file.unlink()
+                    print(f"[CLEANUP] Deleted: {file}")
+                except Exception as e:
+                    print(f"[CLEANUP ERROR] {file}: {e}")
+
+# 保存前にフックする
+script_callbacks.on_before_image_saved(clean_outputs_before_save)
