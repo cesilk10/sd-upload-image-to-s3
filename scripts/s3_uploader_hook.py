@@ -1,5 +1,8 @@
 import os
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
 import boto3
 from modules import script_callbacks, shared
 
@@ -7,8 +10,12 @@ from modules import script_callbacks, shared
 # AWS設定
 session = boto3.Session(profile_name="")
 s3 = session.client("s3", region_name="ap-northeast-1")
-
 bucket_name = ""
+
+
+def current_jst_date() -> str:
+    japan_now = datetime.now(ZoneInfo("Asia/Tokyo"))
+    return japan_now.strftime("%Y-%m-%d")
 
 
 # shared.opts に設定追加（UIにも表示される）
@@ -30,14 +37,22 @@ def on_image_saved(params):
     path = Path(params.filename)
     if not path.exists():
         return
+
+    date = current_jst_date()
+
     try:
-        s3.upload_file(str(path), bucket_name, path.as_posix())
-        print(f"[S3 UPLOAD] {path.as_posix()}")
+        s3_path = f"outputs/{date}/{path.name}"
+        s3.upload_file(str(path), bucket_name, s3_path)
+
+        print(f"[S3 UPLOAD] {s3_path}")
 
         jpg_path = Path(params.filename.replace(".png", ".jpg"))
+
         if jpg_path.exists():
-            s3.upload_file(str(jpg_path), bucket_name, jpg_path.as_posix())
-            print(f"[S3 UPLOAD JPG] {jpg_path.as_posix()}")
+            s3_path2 = f"outputs/{date}/{jpg_path.name}"
+            s3.upload_file(str(jpg_path), bucket_name, s3_path2)
+
+            print(f"[S3 UPLOAD JPG] {s3_path2}")
     except Exception as e:
         print(f"[S3 ERROR] {e}")
 
